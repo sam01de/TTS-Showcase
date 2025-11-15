@@ -10,6 +10,18 @@ def convert_audio_to_wav(audio_path):
     Supports common formats: mp3, m4a, flac, ogg, etc.
     Returns path to WAV file (original or temporary converted file).
     """
+    # Resolve relative paths to absolute paths relative to input/ directory
+    if not os.path.isabs(audio_path):
+        audio_path = os.path.join(os.path.dirname(__file__), 'input', audio_path)
+    
+    # Check if file exists - provide clear error message
+    if not os.path.exists(audio_path):
+        raise FileNotFoundError(
+            f"\n❌ Speaker audio file not found: {audio_path}\n"
+            f"💡 Tip: Place your audio file in the 'input/' directory and use just the filename.\n"
+            f"   Example: -s voice_trump.mp3 (not -s input/voice_trump.mp3)"
+        )
+    
     # Check if already WAV
     if audio_path.lower().endswith('.wav'):
         return audio_path, None
@@ -27,12 +39,12 @@ def convert_audio_to_wav(audio_path):
     temp_wav_path = os.path.join(temp_dir, f"{base_name_no_ext}.wav")
     
     # Load audio in original format
-    print(f"Converting {file_ext.upper()} to WAV format...")
+    print(f"🔄 Converting {file_ext.upper()} to WAV format...")
     audio = AudioSegment.from_file(audio_path, format=file_ext)
     
     # Export as WAV
     audio.export(temp_wav_path, format='wav')
-    print(f"Converted to: {temp_wav_path}")
+    print(f"   Saved to: {temp_wav_path}")
     
     return temp_wav_path, temp_wav_path
 
@@ -54,19 +66,26 @@ tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
 # Convert speaker audio to WAV if needed
 speaker_wav_path, temp_file = convert_audio_to_wav(args.speaker)
 
+# Ensure output directory exists
+output_dir = os.path.join(os.path.dirname(__file__), 'output')
+os.makedirs(output_dir, exist_ok=True)
+
 try:
     # Generate speech by cloning a voice using provided parameters
+    output_filename = args.output if args.output.lower().endswith('.wav') else args.output + '.wav'
+    output_path = os.path.join(output_dir, output_filename)
+    
     tts.tts_to_file(text=args.text, 
-                    file_path='output/' + (args.output if args.output.lower().endswith('.wav') else args.output + '.wav'),
-                    speaker_wav='input/' + speaker_wav_path,
+                    file_path=output_path,
+                    speaker_wav=speaker_wav_path,
                     split_sentences=False,
                     language=args.language)
-    print(f"Successfully generated speech: {args.output}")
+    print(f"\n✅ Successfully generated speech: {output_path}")
 finally:
     # Clean up temporary converted file if --delete-converted is specified
     if temp_file and os.path.exists(temp_file):
         if args.delete_converted:
             os.unlink(temp_file)
-            print(f"Cleaned up temporary converted file")
+            print(f"🗑️  Cleaned up temporary converted file")
         else:
-            print(f"Converted file kept at: {temp_file}")
+            print(f"💾 Converted file kept at: {temp_file}")
